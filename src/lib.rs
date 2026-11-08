@@ -115,9 +115,7 @@ mod test {
         });
     }
 
-    // macOS will be blocked forever.
     #[test]
-    #[cfg(all(not(target_os = "macos"), not(target_os = "ios"), not(target_os = "watchos")))]
     fn wait_unexpected() {
         let t = std::time::Instant::now();
         let a = std::sync::atomic::AtomicU32::new(0);

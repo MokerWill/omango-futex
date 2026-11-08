@@ -20,7 +20,7 @@
 
 use std::{
     ffi::c_void,
-    sync::atomic::AtomicU32,
+    sync::atomic::{AtomicU32, Ordering},
 };
 
 // On macOS, atomic wait/wake functionality is not available through
@@ -70,12 +70,18 @@ pub(crate) fn wait_until(_: &AtomicU32, _: u32, _: u32) -> bool {
 }
 
 #[inline(always)]
-pub(crate) fn wait(atom: &AtomicU32, _: u32) -> bool {
+pub(crate) fn wait(atom: &AtomicU32, expected: u32) -> bool {
     let ptr: *const AtomicU32 = atom;
     // The 'monitor' is just the notification counter associated
     // with the address of the atomic.
     let monitor = unsafe { __libcpp_atomic_monitor(ptr.cast()) };
 
+    // Re-check the value after taking the monitor, as libc++'s own wait loop does. A wake that
+    // came before the monitor was taken has already changed the value; `__libcpp_atomic_wait`
+    // only waits for the next notification, so without this check it would sleep through it.
+    if atom.load(Ordering::SeqCst) != expected {
+        return true;
+    }
     unsafe { __libcpp_atomic_wait(ptr.cast(), monitor) };
     true
 }
